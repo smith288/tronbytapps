@@ -87,13 +87,25 @@ def is_live(status):
     # Excludes warmup, delays, suspensions, pregame, and final states.
     return status.get("abstractGameState") == "Live" and status.get("statusCode") == "I"
 
+def mlb_id(value):
+    # http.json() decodes numbers as floats, so 113 becomes "113.0" via str().
+    if value == None:
+        return ""
+    if type(value) == "float":
+        return str(int(value)) if value else ""
+    if type(value) == "int":
+        return str(value) if value else ""
+    text = str(value)
+    return text[:-2] if text.endswith(".0") else text
+
 def find_game(schedule, team):
     for day in schedule.get("dates", []):
         for game in day.get("games", []):
             sides = game.get("teams", {})
-            ids = [str(sides.get(side, {}).get("team", {}).get("id", "")) for side in ["home", "away"]]
-            if team in ids and is_live(game.get("status", {})) and game.get("gamePk"):
-                return game["gamePk"]
+            ids = [mlb_id(sides.get(side, {}).get("team", {}).get("id")) for side in ["home", "away"]]
+            game_pk = mlb_id(game.get("gamePk"))
+            if team in ids and is_live(game.get("status", {})) and game_pk:
+                return game_pk
     return None
 
 def season_stats(player, group, game_id, season):
@@ -136,23 +148,25 @@ def matchup(feed, game_id):
     defense = lines.get("defense", {})
     batter = offense.get("batter", {}).get("id")
     pitcher = defense.get("pitcher", {}).get("id")
-    batting_team = str(offense.get("team", {}).get("id", ""))
-    pitching_team = str(defense.get("team", {}).get("id", ""))
-    if not batter or not pitcher or batting_team not in TEAMS or pitching_team not in TEAMS or batting_team == pitching_team:
+    batter_id = mlb_id(batter)
+    pitcher_id = mlb_id(pitcher)
+    batting_team = mlb_id(offense.get("team", {}).get("id"))
+    pitching_team = mlb_id(defense.get("team", {}).get("id"))
+    if not batter_id or not pitcher_id or batting_team not in TEAMS or pitching_team not in TEAMS or batting_team == pitching_team:
         return None
     teams = data.get("teams", {})
-    home = str(teams.get("home", {}).get("id", ""))
-    away = str(teams.get("away", {}).get("id", ""))
+    home = mlb_id(teams.get("home", {}).get("id"))
+    away = mlb_id(teams.get("away", {}).get("id"))
     if sorted([batting_team, pitching_team]) != sorted([home, away]):
         return None
     boxes = live.get("boxscore", {}).get("teams", {})
     bat_side = "home" if batting_team == home else "away"
     pitch_side = "home" if pitching_team == home else "away"
-    bat_player = boxes.get(bat_side, {}).get("players", {}).get("ID{}".format(batter), {})
-    pitch_player = boxes.get(pitch_side, {}).get("players", {}).get("ID{}".format(pitcher), {})
+    bat_player = boxes.get(bat_side, {}).get("players", {}).get("ID{}".format(batter_id), {})
+    pitch_player = boxes.get(pitch_side, {}).get("players", {}).get("ID{}".format(pitcher_id), {})
     people = data.get("players", {})
-    bat_name = people.get("ID{}".format(batter), {}).get("useLastName") or people.get("ID{}".format(batter), {}).get("lastName")
-    pitch_name = people.get("ID{}".format(pitcher), {}).get("useLastName") or people.get("ID{}".format(pitcher), {}).get("lastName")
+    bat_name = people.get("ID{}".format(batter_id), {}).get("useLastName") or people.get("ID{}".format(batter_id), {}).get("lastName")
+    pitch_name = people.get("ID{}".format(pitcher_id), {}).get("useLastName") or people.get("ID{}".format(pitcher_id), {}).get("lastName")
     if not bat_name or not pitch_name or not bat_player or not pitch_player:
         return None
     season = data.get("game", {}).get("season", "")

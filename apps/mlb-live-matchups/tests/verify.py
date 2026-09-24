@@ -85,6 +85,8 @@ def main(config):
         label = text_line(name, "#fff", canvas.width() - 4, name = True)
         expect(label.frame_count() > 1, "long name scrolls")
     expect(text_line("B:LEE", "#fff", canvas.width() - 4, name = True).frame_count() == 1, "short line stays still")
+    expect(mlb_id(113.0) == "113" and mlb_id(824866.0) == "824866", "float json ids")
+    expect(find_game({"dates": [{"games": [{"gamePk": 824866.0, "status": {"abstractGameState": "Live", "statusCode": "I"}, "teams": {"home": {"team": {"id": 144.0}}, "away": {"team": {"id": 113.0}}}}]}]}, "113") == "824866", "schedule float ids")
     expect(first_pitch_thrown(feed), "first pitch")
     feed["liveData"]["plays"] = {}
     expect(not first_pitch_thrown(feed), "before first pitch")
@@ -103,7 +105,7 @@ with tempfile.TemporaryDirectory(prefix="mlb-matchups-tests-") as directory:
         target = APP / ("mlb-live-matchups@2x.webp" if two_x else "mlb-live-matchups.webp") if "--previews" in sys.argv else temp / "preview.webp"
         print(run(script, target, two_x).strip())
 
-    scenarios = ["live", "no-game", "pregame", "final", "delayed", "before-pitch", "missing-batter", "missing-pitcher", "missing-stats", "http-error", "cold-delay", "invalid-delay", "wrong-team", "away-batter"]
+    scenarios = ["live", "no-game", "pregame", "final", "delayed", "before-pitch", "missing-batter", "missing-pitcher", "missing-stats", "http-error", "cold-delay", "invalid-delay", "wrong-team", "away-batter", "float-ids"]
     for scenario in scenarios:
         feed = copy.deepcopy(FIXTURE)
         status = {"abstractGameState": "Live", "statusCode": "I"}
@@ -133,7 +135,17 @@ with tempfile.TemporaryDirectory(prefix="mlb-matchups-tests-") as directory:
             feed["gameData"]["teams"] = {"home": {"id": 147}, "away": {"id": 139}}
             boxes = feed["liveData"]["boxscore"]["teams"]
             boxes["home"], boxes["away"] = boxes["away"], boxes["home"]
-        expected_live = scenario in ["live", "away-batter"]
+        elif scenario == "float-ids":
+            schedule["dates"][0]["games"][0]["gamePk"] = 123.0
+            schedule["dates"][0]["games"][0]["teams"]["home"]["team"]["id"] = 139.0
+            schedule["dates"][0]["games"][0]["teams"]["away"]["team"]["id"] = 147.0
+            feed["gameData"]["teams"]["home"]["id"] = 139.0
+            feed["gameData"]["teams"]["away"]["id"] = 147.0
+            feed["liveData"]["linescore"]["offense"]["team"]["id"] = 139.0
+            feed["liveData"]["linescore"]["defense"]["team"]["id"] = 147.0
+            feed["liveData"]["linescore"]["offense"]["batter"]["id"] = 1.0
+            feed["liveData"]["linescore"]["defense"]["pitcher"]["id"] = 2.0
+        expected_live = scenario in ["live", "away-batter", "float-ids"]
         script.write_text(header.replace("def fetch_json(", "def real_fetch_json(") + '''
 def fetch_json(path, ttl):
     return json.decode(SCHEDULE if path.startswith("/v1/schedule") else FEED)
