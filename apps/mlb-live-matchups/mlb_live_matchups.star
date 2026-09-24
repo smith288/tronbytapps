@@ -110,6 +110,24 @@ def season_stats(player, group, game_id, season):
     cache.set(key, json.encode(result), ttl_seconds = 1800)
     return result
 
+def game_summary(player, group):
+    # Read every feed update, independently of the season-stat cache. Store the
+    # resulting line in the matchup snapshot so broadcast delay covers it too.
+    stats = player.get("stats", {}).get(group, {})
+    if group == "batting":
+        if any([stats.get(field) == None for field in ["hits", "atBats", "homeRuns", "strikeOuts"]]):
+            return ""
+        parts = ["{}-{}".format(stats["hits"], stats["atBats"])]
+        homers = stats["homeRuns"]
+        if homers:
+            parts.append("HR" if homers == 1 else "{}HR".format(homers))
+        parts.append("{}K".format(stats["strikeOuts"]))
+    else:
+        if any([stats.get(field) == None for field in ["inningsPitched", "strikeOuts", "earnedRuns"]]):
+            return ""
+        parts = ["{}IP".format(stats["inningsPitched"]), "{}K".format(stats["strikeOuts"]), "{}ER".format(stats["earnedRuns"])]
+    return " (" + " ".join(parts) + ")"
+
 def matchup(feed, game_id):
     data = feed.get("gameData", {})
     live = feed.get("liveData", {})
@@ -151,6 +169,8 @@ def matchup(feed, game_id):
         "pitch_team": pitching_team,
         "bat_stats": bat_stats,
         "pitch_stats": pitch_stats,
+        "bat_game": game_summary(bat_player, "batting"),
+        "pitch_game": game_summary(pitch_player, "pitching"),
     }
 
 def first_pitch_thrown(feed):
@@ -202,11 +222,14 @@ def display_name(name):
 def text_line(content, color, width, name = False):
     font = "6x10" if canvas.is2x() else "CG-pixel-3x5-mono"
     label = render.Text(content, font = font, color = color)
-    if name and label.size()[0] > width:
-        for count in range(len(content) - 1, 0, -1):
-            label = render.Text(content[:count] + ".", font = font, color = color)
-            if label.size()[0] <= width:
-                break
+    if name:
+        return render.Marquee(
+            child = label,
+            width = width,
+            align = "start",
+            offset_end = width,
+            delay = 54 if canvas.is2x() else 27,
+        )
     return label
 
 def section(team, rows):
@@ -217,22 +240,42 @@ def section(team, rows):
         width = canvas.width(),
         height = canvas.height() // 2,
         color = background,
-        child = render.Column(children = [text_line(row, foreground, canvas.width() - 2 * scale, name = i == 0) for i, row in enumerate(rows)]),
+        child = render.Padding(
+            pad = (scale, 0, scale, 0),
+            child = render.Row(
+                expanded = True,
+                main_align = "start",
+                children = [render.Column(
+                    cross_align = "start",
+                    children = [
+                        text_line(rows[0], foreground, canvas.width() - 2 * scale, name = True),
+                        render.Padding(
+                            pad = (2 * scale, 0, 0, 0),
+                            child = render.Column(
+                                cross_align = "start",
+                                children = [text_line(row, foreground, canvas.width() - 4 * scale) for row in rows[1:]],
+                            ),
+                        ),
+                    ],
+                )],
+            ),
+        ),
     )
 
 def render_matchup(state):
     bat = state["bat_stats"]
     pitch = state["pitch_stats"]
     return render.Root(
+        delay = 37 if canvas.is2x() else 75,
         max_age = 15,
         child = render.Column(children = [
             section(state["bat_team"], [
-                "B:" + display_name(state["bat_name"]),
+                "B:" + display_name(state["bat_name"]) + state.get("bat_game", ""),
                 "AVG {}".format(bat["avg"]),
                 "{}HR {}RBI".format(bat["homeRuns"], bat["rbi"]),
             ]),
             section(state["pitch_team"], [
-                "P:" + display_name(state["pitch_name"]),
+                "P:" + display_name(state["pitch_name"]) + state.get("pitch_game", ""),
                 "{}ERA {}K".format(pitch["era"], pitch["strikeOuts"]),
                 "{}BB {}HR".format(pitch["baseOnBalls"], pitch["homeRuns"]),
             ]),
@@ -254,7 +297,7 @@ def main(config):
     # Include yesterday so a game crossing midnight is still followed.
     start = time.from_timestamp(now.unix - 86400).in_location("America/New_York").format("2006-01-02")
     end = now.in_location("America/New_York").format("2006-01-02")
-    history_key = "mlb-matchups:history:v1:" + team
+    history_key = "mlb-matchups:history:v2:" + team
     schedule = fetch_json("/v1/schedule?sportId=1&teamId={}&startDate={}&endDate={}".format(team, start, end), 5)
     game_id = find_game(schedule, team) if schedule else None
     if not game_id:

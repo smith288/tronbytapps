@@ -39,6 +39,17 @@ def main(config):
     expect(current["batter"] == 1 and current["pitcher"] == 2, "active players")
     expect(current["bat_stats"]["homeRuns"] == 18, "batter stats")
     expect(current["pitch_stats"]["homeRuns"] == 12, "pitcher HR allowed")
+    expect(current["bat_game"] == " (1-2 HR 1K)", "batter game summary")
+    expect(current["pitch_game"] == " (4.2IP 5K 2ER)", "pitcher game summary")
+    feed["liveData"]["boxscore"]["teams"]["home"]["players"]["ID1"]["stats"]["batting"]["homeRuns"] = 2
+    updated = matchup(feed, 123)
+    expect(updated["bat_game"] == " (1-2 2HR 1K)", "game stats refresh despite season cache")
+    expect(current["bat_game"] == " (1-2 HR 1K)", "older snapshot unchanged")
+    expect(game_summary({}, "batting") == "", "missing game stats omitted")
+    expect(game_summary({"stats": {"batting": {"hits": 0, "atBats": 0, "homeRuns": 0, "strikeOuts": 0}}}, "batting") == " (0-0 0K)", "zero game stats")
+    history = record_sample([], current, 0)
+    history = record_sample(history, updated, 5)
+    expect(delayed_matchup(history, 5, 5)["bat_game"] == " (1-2 HR 1K)", "game stats obey broadcast delay")
     expect(current["bat_team"] == "139" and current["pitch_team"] == "147", "team assignment")
     feed["liveData"]["linescore"]["offense"]["batter"]["id"] = 3
     feed["liveData"]["linescore"]["defense"]["pitcher"]["id"] = 4
@@ -70,9 +81,10 @@ def main(config):
     expect(len(history) <= 49, "history bounded")
     expect(contrast("#FFFFFF") == "#000000" and contrast("#092C5C") == "#FFFFFF", "contrast")
     expect(display_name("Rodríguez") == "RODRIGUEZ", "name transliteration")
-    for name in ["B:ENCARNACION-STRAND", "P:WOJCIECHOWSKI"]:
+    for name in ["B:ENCARNACION-STRAND (1-2 HR 1K)", "P:WOJCIECHOWSKI (4.2IP 5K 2ER)"]:
         label = text_line(name, "#fff", canvas.width() - 4, name = True)
-        expect(label.size()[0] <= canvas.width() - 4, "long name fits")
+        expect(label.frame_count() > 1, "long name scrolls")
+    expect(text_line("B:LEE", "#fff", canvas.width() - 4, name = True).frame_count() == 1, "short line stays still")
     expect(first_pitch_thrown(feed), "first pitch")
     feed["liveData"]["plays"] = {}
     expect(not first_pitch_thrown(feed), "before first pitch")

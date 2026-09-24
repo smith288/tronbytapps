@@ -10,9 +10,17 @@ load("math.star", "math")
 load("render.star", "render")
 load("schema.star", "schema")
 
-DEFAULT_URL_SPA = "http://homebridge:8086/query?pretty=true&db=nodered&q=SELECT+last%28%22ext_temperature_f_0%22%29+as+%22Spa%22%2c+last%28%22ext_temperature_f_1%22%29+as+%22Air%22%2c+last%28%22volts_0%22%29+as+volts++FROM+%22pool_temp%22+"
-DEFAULT_URL_LANAI = "http://homebridge:8086/query?pretty=true&db=weatherstation&q=SELECT%20last(%22humidity%22),%20last(%22tempf%22),%20last(%22windspeedmph%22)%20FROM%20%22weather%22"
-DEFAULT_URL_RAINCHECK = "http://shelly1minig3-84fce6373d68/rpc/Shelly.GetStatus"
+# Leave defaults empty so Docker/Tronbyt preview does not dial LAN hosts.
+# Pixlet's http.get aborts the whole script on connection refused (no try/catch).
+DEFAULT_URL_SPA = ""
+DEFAULT_URL_LANAI = ""
+DEFAULT_URL_RAINCHECK = ""
+
+# Shown when a URL is unset so preview still renders.
+DEMO_SPA_TEMP = 101
+DEMO_AIR_TEMP = 78
+DEMO_HUMIDITY = 55
+DEMO_WIND_MPH = 3.0
 
 DEFAULT_FONT = "tb-8"
 HTTP_TTL_SECONDS = 30
@@ -121,30 +129,41 @@ def main(config):
     lanaiFeelsLike = None
     uni_battery_volts = None
 
-    spa_data = fetch_json(url_spa, "Spa")
-    spa_row = influx_row(spa_data)
-    if spa_row != None:
-        spaTemp = as_number(list_get(spa_row, 1))
-        uni_battery_volts = as_number(list_get(spa_row, 3))
-
-    lanai_data = fetch_json(url_lanai, "Lanai")
-    lanai_row = influx_row(lanai_data)
-    if lanai_row != None:
-        humidity = as_number(list_get(lanai_row, 1))
-        lanaiTemp = as_number(list_get(lanai_row, 2))
-        lanaiWindSpeed = as_number(list_get(lanai_row, 3))
-        if lanaiTemp != None:
-            ambientTemp = lanaiTemp
-        if lanaiTemp != None and humidity != None and lanaiWindSpeed != None:
-            lanaiFeelsLike = calculate_feels_like(lanaiTemp, humidity, lanaiWindSpeed)
-
-    rain_data = fetch_json(url_raincheck, "Raincheck")
-    if rain_data == None:
-        rainColor = "#000"
+    if url_spa:
+        spa_data = fetch_json(url_spa, "Spa")
+        spa_row = influx_row(spa_data)
+        if spa_row != None:
+            spaTemp = as_number(list_get(spa_row, 1))
+            uni_battery_volts = as_number(list_get(spa_row, 3))
     else:
-        switch = rain_data.get("switch:0")
-        if type(switch) != "dict" or switch.get("output") != True:
+        spaTemp = DEMO_SPA_TEMP
+
+    if url_lanai:
+        lanai_data = fetch_json(url_lanai, "Lanai")
+        lanai_row = influx_row(lanai_data)
+        if lanai_row != None:
+            humidity = as_number(list_get(lanai_row, 1))
+            lanaiTemp = as_number(list_get(lanai_row, 2))
+            lanaiWindSpeed = as_number(list_get(lanai_row, 3))
+            if lanaiTemp != None:
+                ambientTemp = lanaiTemp
+            if lanaiTemp != None and humidity != None and lanaiWindSpeed != None:
+                lanaiFeelsLike = calculate_feels_like(lanaiTemp, humidity, lanaiWindSpeed)
+    else:
+        humidity = DEMO_HUMIDITY
+        ambientTemp = DEMO_AIR_TEMP
+        lanaiFeelsLike = calculate_feels_like(DEMO_AIR_TEMP, DEMO_HUMIDITY, DEMO_WIND_MPH)
+
+    if url_raincheck:
+        rain_data = fetch_json(url_raincheck, "Raincheck")
+        if rain_data == None:
             rainColor = "#000"
+        else:
+            switch = rain_data.get("switch:0")
+            if type(switch) != "dict" or switch.get("output") != True:
+                rainColor = "#000"
+    else:
+        rainColor = "#000"
 
     if spaTemp != None and spaTemp > 90:
         spaColor = "#FFFF00"
@@ -246,21 +265,21 @@ def get_schema():
             schema.Text(
                 id = "url_spa",
                 name = "Spa URL",
-                desc = "InfluxDB query URL for spa temperature and battery voltage.",
+                desc = "InfluxDB query URL for spa temperature. Must be reachable from the Tronbyt server (use a LAN IP if the hostname fails).",
                 icon = "link",
                 default = DEFAULT_URL_SPA,
             ),
             schema.Text(
                 id = "url_lanai",
                 name = "Lanai URL",
-                desc = "InfluxDB query URL for lanai temperature, humidity, and wind.",
+                desc = "InfluxDB query URL for lanai temperature, humidity, and wind. Must be reachable from the Tronbyt server.",
                 icon = "link",
                 default = DEFAULT_URL_LANAI,
             ),
             schema.Text(
                 id = "url_raincheck",
                 name = "Raincheck URL",
-                desc = "Shelly status URL for the rain sensor.",
+                desc = "Shelly status URL for the rain sensor. Must be reachable from the Tronbyt server.",
                 icon = "link",
                 default = DEFAULT_URL_RAINCHECK,
             ),
