@@ -1,0 +1,30 @@
+{
+  "gameData": {
+    "status": {"abstractGameState": "Live", "statusCode": "I"},
+    "game": {"season": "2026"},
+    "teams": {"home": {"id": 139}, "away": {"id": 147}},
+    "players": {
+      "ID1": {"lastName": "Mullins"},
+      "ID2": {"lastName": "Fried"},
+      "ID3": {"lastName": "Caminero"},
+      "ID4": {"lastName": "Rodríguez"}
+    }
+  },
+  "liveData": {
+    "linescore": {
+      "offense": {"batter": {"id": 1}, "team": {"id": 139}},
+      "defense": {"pitcher": {"id": 2}, "team": {"id": 147}}
+    },
+    "plays": {"currentPlay": {"playEvents": [{"isPitch": true}]}},
+    "boxscore": {"teams": {
+      "home": {"players": {
+        "ID1": {"person": {"id": 1}, "seasonStats": {"batting": {"avg": ".272", "homeRuns": 18, "rbi": 61}}},
+        "ID3": {"person": {"id": 3}, "seasonStats": {"batting": {"avg": ".280", "homeRuns": 25, "rbi": 82}}}
+      }},
+      "away": {"players": {
+        "ID2": {"person": {"id": 2}, "seasonStats": {"pitching": {"era": "2.63", "strikeOuts": 100, "baseOnBalls": 31, "homeRuns": 12}}},
+        "ID4": {"person": {"id": 4}, "seasonStats": {"pitching": {"era": "3.50", "strikeOuts": 60, "baseOnBalls": 20, "homeRuns": 5}}}
+      }}
+    }}
+  }
+}

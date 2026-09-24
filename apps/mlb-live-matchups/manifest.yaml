@@ -1,0 +1,15 @@
+---
+id: mlb-live-matchups
+name: MLB Live Matchups
+summary: Live MLB player matchups
+desc: Follow your favorite team's live batter and pitcher with season statistics, team colors, and a configurable broadcast delay. Requires frequent refreshes for synchronization.
+author: smith288
+fileName: mlb_live_matchups.star
+packageName: mlb-live-matchups
+# Tronbyt intervals are minutes; zero requests a render whenever scheduled.
+recommendedInterval: 0
+supports2x: true
+category: sports
+tags:
+  - mlb
+  - baseball
