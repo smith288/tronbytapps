@@ -23,6 +23,8 @@ are displayed.
 - **Favorite Team:** all 30 MLB teams; defaults to Tampa Bay Rays (`team=139`).
 - **Broadcast Delay:** a whole number from 0 through 180 seconds; defaults to 0
   (`broadcast_delay=25`, for example). Invalid configuration renders nothing.
+  Until a sample is old enough, the current matchup is shown so the app does
+  not stay blank.
 
 The app queries MLB's schedule for today and yesterday in America/New_York, which
 keeps overnight games discoverable. It selects an in-progress game involving the
@@ -32,17 +34,14 @@ nothing. Final status stops rendering immediately, including with a delay set.
 
 ## Refresh and synchronization requirements
 
-**Set the app's update interval to 0 minutes (render whenever scheduled), and
-arrange for this app to be rendered every 5 seconds during the game.** The manifest
-recommends `0`: Tronbyt's `recommendedInterval` is in **minutes**, so `5` would be
-five minutes, not five seconds. The app cannot start a background polling loop or
-change your server/device refresh settings.
+**Set the app's update interval to 0 minutes (render whenever scheduled).** The
+manifest recommends `0`: Tronbyt's `recommendedInterval` is in **minutes**.
+More frequent renders make broadcast delay closer to the configured value;
+rotation gaps no longer blank the display.
 
 Use an always-running Pixlet/Tronbyt renderer with a cache that survives between
-renders. The actual render cadence depends on your server, display dwell time,
-and app rotation. A long rotation can prevent this cadence even with update
-interval 0; confirm render timestamps in server logs. Independent CLI `pixlet
-render` invocations do not preserve the in-memory history across processes.
+renders. Independent CLI `pixlet render` invocations do not preserve in-memory
+history across processes, so delay falls back to the current matchup.
 
 Schedule and feed HTTP responses have a 5-second cache TTL. Season statistics are
 read from the feed's `seasonStats` (not the current game's `stats`) and cached by
@@ -50,16 +49,11 @@ game, season, player, and role for 30 minutes. There are no separate player HTTP
 requests. Stats represent the season values MLB supplies for that game context.
 
 The app retains up to four minutes of timestamped observations and selects the
-latest observation at or before `now - delay`. This adds roughly one sampling
-interval of uncertainty, plus API caching and device display latency. Delay can
-only make the API information appear later; it cannot fix an already-late API.
-
-On a cold start, the display remains empty until enough history exists for the
-requested delay. Gaps longer than 15 seconds reset history rather than inventing
-unobserved matchups. Changing games also resets history. A temporarily missing
-matchup keeps the last complete pair for at most 20 seconds, then records an empty
-state. The configured delay also applies to those empty states. A new complete
-pair updates both players and their colors together.
+latest observation at or before `now - delay`. If none exists yet, it shows the
+latest observation so a delay setting still renders. Changing games resets
+history. A temporarily missing matchup keeps the last complete pair for at most
+20 seconds, then records an empty state. A new complete pair updates both
+players and their colors together.
 
 ## Error behavior
 

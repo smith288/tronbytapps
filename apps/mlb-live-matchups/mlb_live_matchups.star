@@ -16,7 +16,6 @@ load("time.star", "time")
 API = "https://statsapi.mlb.com/api"
 HOLD_SECONDS = 20
 HISTORY_SECONDS = 240
-MAX_SAMPLE_GAP = 15
 
 # MLB IDs; abbreviation, name, primary and secondary colors.
 TEAMS = {
@@ -67,7 +66,7 @@ def get_schema():
             schema.Text(
                 id = "broadcast_delay",
                 name = "Broadcast Delay",
-                desc = "Whole seconds, 0–180. Delays observed matchups; requires continuous 5-second refreshes and warms up for this duration.",
+                desc = "Whole seconds, 0–180. Uses the last matchup seen at least this long ago; shows the current pair until then.",
                 icon = "clock",
                 default = "0",
             ),
@@ -182,8 +181,9 @@ def first_pitch_thrown(feed):
     return any([event.get("isPitch", False) for event in plays.get("currentPlay", {}).get("playEvents", [])])
 
 def record_sample(history, current, now):
-    # A polling gap is unknown time, not evidence that the old matchup continued.
-    if history and (now < history[-1]["at"] or now - history[-1]["at"] > MAX_SAMPLE_GAP):
+    # Clock regression is the only reason to drop history. Longer gaps stay
+    # usable so a typical Tronbyt rotation can still apply broadcast delay.
+    if history and now < history[-1]["at"]:
         history = []
     samples = [sample for sample in history if sample["at"] >= now - HISTORY_SECONDS]
     valid_at = now if current != None else None
@@ -202,9 +202,11 @@ def record_sample(history, current, now):
 def delayed_matchup(history, now, delay):
     target = now - delay
     eligible = [sample for sample in history if sample["at"] <= target]
-    if not eligible or target - eligible[-1]["at"] > MAX_SAMPLE_GAP:
-        return None
-    return eligible[-1]["matchup"]
+    if eligible:
+        return eligible[-1]["matchup"]
+    if history:
+        return history[-1]["matchup"]
+    return None
 
 def contrast(background):
     # Compare WCAG relative luminance contrast for black versus white.

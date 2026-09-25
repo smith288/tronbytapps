@@ -58,7 +58,7 @@ def main(config):
         expect(delayed_matchup(history, 240, delay) == expected, "delay {}".format(delay))
     expect(delayed_matchup(history, 240, 145) == current, "before transition")
     expect(delayed_matchup(history, 240, 140) == changed, "at transition")
-    expect(delayed_matchup(record_sample([], current, 100), 100, 15) == None, "cold start")
+    expect(delayed_matchup(record_sample([], current, 100), 100, 15) == current, "cold start shows current")
     history = record_sample([], current, 100)
     for now in [105, 110, 115, 120]:
         history = record_sample(history, None, now)
@@ -68,7 +68,7 @@ def main(config):
     history = record_sample(history, changed, 130)
     expect(delayed_matchup(history, 130, 0) == changed, "recover missing players")
     history = record_sample(history, changed, 200)
-    expect(delayed_matchup(history, 200, 60) == None, "polling gap resets history")
+    expect(delayed_matchup(history, 200, 60) == changed, "gap keeps last delayed sample")
     expect(len(record_sample(history, current, 190)) == 1, "clock regression")
     for now in range(205, 605, 5):
         history = record_sample(history, current, now)
@@ -134,7 +134,7 @@ with tempfile.TemporaryDirectory(prefix="mlb-matchups-tests-") as directory:
             feed["liveData"]["linescore"]["defense"]["team"]["id"] = 147.0
             feed["liveData"]["linescore"]["offense"]["batter"]["id"] = 1.0
             feed["liveData"]["linescore"]["defense"]["pitcher"]["id"] = 2.0
-        expected_live = scenario in ["live", "away-batter", "float-ids"]
+        expected_live = scenario in ["live", "away-batter", "float-ids", "cold-delay"]
         script.write_text(header.replace("def fetch_json(", "def real_fetch_json(") + '''
 def fetch_json(path, ttl):
     return json.decode(SCHEDULE if path.startswith("/v1/schedule") else FEED)
