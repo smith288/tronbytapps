@@ -225,14 +225,18 @@ def section(team, rows):
         width = canvas.width(),
         height = canvas.height() // 2,
         color = background,
-        child = render.Padding(
-            pad = (scale, 0, scale, 0),
-            child = render.Column(
-                expanded = True,
-                main_align = "space-between",
-                cross_align = "start",
-                children = [text_line(row, foreground) for row in rows],
-            ),
+        child = render.Row(
+            expanded = True,
+            main_align = "start",
+            children = [render.Padding(
+                pad = (scale, 0, 0, 0),
+                child = render.Column(
+                    expanded = True,
+                    main_align = "space-between",
+                    cross_align = "start",
+                    children = [text_line(row, foreground) for row in rows],
+                ),
+            )],
         ),
     )
 
