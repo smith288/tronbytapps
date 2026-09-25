@@ -39,23 +39,17 @@ def main(config):
     expect(current["batter"] == 1 and current["pitcher"] == 2, "active players")
     expect(current["bat_stats"]["homeRuns"] == 18, "batter stats")
     expect(current["pitch_stats"]["homeRuns"] == 12, "pitcher HR allowed")
-    expect(current["bat_game"] == " (1-2 HR 1K)", "batter game summary")
-    expect(current["pitch_game"] == " (4.2IP 5K 2ER)", "pitcher game summary")
-    feed["liveData"]["boxscore"]["teams"]["home"]["players"]["ID1"]["stats"]["batting"]["homeRuns"] = 2
-    updated = matchup(feed, 123)
-    expect(updated["bat_game"] == " (1-2 2HR 1K)", "game stats refresh despite season cache")
-    expect(current["bat_game"] == " (1-2 HR 1K)", "older snapshot unchanged")
-    expect(game_summary({}, "batting") == "", "missing game stats omitted")
-    expect(game_summary({"stats": {"batting": {"hits": 0, "atBats": 0, "homeRuns": 0, "strikeOuts": 0}}}, "batting") == " (0-0 0K)", "zero game stats")
-    history = record_sample([], current, 0)
-    history = record_sample(history, updated, 5)
-    expect(delayed_matchup(history, 5, 5)["bat_game"] == " (1-2 HR 1K)", "game stats obey broadcast delay")
+    expect(current.get("bat_game", "") == "" and current.get("pitch_game", "") == "", "no current-game line")
     expect(current["bat_team"] == "139" and current["pitch_team"] == "147", "team assignment")
     feed["liveData"]["linescore"]["offense"]["batter"]["id"] = 3
     feed["liveData"]["linescore"]["defense"]["pitcher"]["id"] = 4
     changed = matchup(feed, 123)
     expect(changed["batter"] == 3 and changed["pitcher"] == 4, "batter/pitcher changes")
     expect(changed["pitch_stats"]["strikeOuts"] == 60, "replacement stats")
+    history = record_sample([], current, 0)
+    history = record_sample(history, changed, 5)
+    expect(delayed_matchup(history, 5, 5)["batter"] == 1, "delay keeps earlier matchup")
+    expect(delayed_matchup(history, 5, 0)["batter"] == 3, "delay 0 is current")
     history = []
     for now in range(0, 241, 5):
         history = record_sample(history, current if now < 100 else changed, now)
@@ -80,17 +74,12 @@ def main(config):
         history = record_sample(history, current, now)
     expect(len(history) <= 49, "history bounded")
     expect(contrast("#FFFFFF") == "#000000" and contrast("#092C5C") == "#FFFFFF", "contrast")
-    expect(display_name("Rodríguez") == "RODRIGUEZ", "name transliteration")
-    for name in ["B:ENCARNACION-STRAND (1-2 HR 1K)", "P:WOJCIECHOWSKI (4.2IP 5K 2ER)"]:
-        label = text_line(name, "#fff", canvas.width() - 4, name = True)
-        expect(label.frame_count() > 1, "long name scrolls")
-    expect(text_line("B:LEE", "#fff", canvas.width() - 4, name = True).frame_count() == 1, "short line stays still")
     expect(mlb_id(113.0) == "113" and mlb_id(824866.0) == "824866", "float json ids")
     expect(find_game({"dates": [{"games": [{"gamePk": 824866.0, "status": {"abstractGameState": "Live", "statusCode": "I"}, "teams": {"home": {"team": {"id": 144.0}}, "away": {"team": {"id": 113.0}}}}]}]}, "113") == "824866", "schedule float ids")
     expect(first_pitch_thrown(feed), "first pitch")
     feed["liveData"]["plays"] = {}
     expect(not first_pitch_thrown(feed), "before first pitch")
-    print("PASS: matchup, replacements, stats, delay boundaries, warmup, holds, gaps, contrast, names")
+    print("PASS: matchup, replacements, stats, delay boundaries, warmup, holds, gaps, contrast")
     return render_matchup(current)
 '''
 

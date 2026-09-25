@@ -5,32 +5,18 @@ the batter; the bottom half shows the pitcher. Each half uses that player's team
 color and automatically selects black or white text for contrast.
 
 ```text
-B:MULLINS (1-2 HR 1K)
-  AVG .272
-  18HR 61RBI
-P:FRIED (4.2IP 5K 2ER)
-  2.63ERA 100K
-  31BB 12HR
+AVG .272
+18 HR 61 RBI
+2.63ERA 100K
+31 BB 12 HR
 ```
 
 These example numbers and the bundled previews are illustrative fixtures, not
-current MLB statistics. `B:` means batter, `P:` means pitcher, `K` means strikeouts,
-and pitcher `HR` means home runs allowed. Season-stat rows are indented two pixels
-under the left-aligned names (four pixels at 2×).
-
-Parentheses beside the batter name show today's hits–at-bats, home runs when
-nonzero (`HR` for one, `2HR` for two), and strikeouts. Beside the pitcher name they
-show innings pitched, strikeouts, and earned runs. For example, `4.2IP` means four
-innings and two outs. Missing game stats omit the parenthetical rather than
-inventing zeroes. These values refresh with each live-feed update and are included
-in the broadcast-delayed snapshot; they do not use the season-stat cache.
-
-Name lines that overflow pause for about two seconds, then scroll to reveal the
-complete name and current-game stats. Lines that fit remain still. Season stats
-stay fixed while the name line scrolls. Allow enough device display time to see
-the scroll; a host that restarts animations on every refresh may interrupt it.
-Accents are transliterated for the compact bitmap fonts. A 128×64 layout is
-also supported. No scores, logos, or pregame information are displayed.
+current MLB statistics. The top half is the current batter's season line; the
+bottom half is the current pitcher's. `K` means strikeouts, and pitcher `HR`
+means home runs allowed. Names and current-game line scores are not shown.
+A 128×64 layout is also supported. No scores, logos, or pregame information
+are displayed.
 
 ## Configuration
 
@@ -104,8 +90,7 @@ python3 mlb-live-matchups/tests/verify.py /path/to/pixlet --previews
 The offline suite executes the actual Starlark code in Pixlet with fixture feeds.
 It checks player replacement, season stats, home/away roles, missing data, no-game,
 pregame, final, delay boundaries at 0/15/30/60/120/180 seconds, cold starts, brief
-holds, expired holds, polling gaps, bounded history, contrast, long scrolling
-names, stationary short names, and fresh/broadcast-delayed current-game stats.
+holds, expired holds, polling gaps, bounded history, and contrast.
 It renders and checks both resolutions. `--previews` regenerates the bundled
 64×32 and 128×64 WebP previews; it does not enable fixture data in the production
 app or add a user-facing setting.

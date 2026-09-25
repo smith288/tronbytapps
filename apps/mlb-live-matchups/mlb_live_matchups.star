@@ -98,6 +98,14 @@ def mlb_id(value):
     text = str(value)
     return text[:-2] if text.endswith(".0") else text
 
+def whole_count(value):
+    # Count stats arrive as floats from http.json(); keep true fractions (4.2 IP).
+    if type(value) == "float" and value == int(value):
+        return int(value)
+    if type(value) == "string" and value.endswith(".0"):
+        return int(float(value))
+    return value
+
 def find_game(schedule, team):
     for day in schedule.get("dates", []):
         for game in day.get("games", []):
@@ -121,24 +129,6 @@ def season_stats(player, group, game_id, season):
     result = {field: stats[field] for field in required}
     cache.set(key, json.encode(result), ttl_seconds = 1800)
     return result
-
-def game_summary(player, group):
-    # Read every feed update, independently of the season-stat cache. Store the
-    # resulting line in the matchup snapshot so broadcast delay covers it too.
-    stats = player.get("stats", {}).get(group, {})
-    if group == "batting":
-        if any([stats.get(field) == None for field in ["hits", "atBats", "homeRuns", "strikeOuts"]]):
-            return ""
-        parts = ["{}-{}".format(stats["hits"], stats["atBats"])]
-        homers = stats["homeRuns"]
-        if homers:
-            parts.append("HR" if homers == 1 else "{}HR".format(homers))
-        parts.append("{}K".format(stats["strikeOuts"]))
-    else:
-        if any([stats.get(field) == None for field in ["inningsPitched", "strikeOuts", "earnedRuns"]]):
-            return ""
-        parts = ["{}IP".format(stats["inningsPitched"]), "{}K".format(stats["strikeOuts"]), "{}ER".format(stats["earnedRuns"])]
-    return " (" + " ".join(parts) + ")"
 
 def matchup(feed, game_id):
     data = feed.get("gameData", {})
@@ -183,8 +173,6 @@ def matchup(feed, game_id):
         "pitch_team": pitching_team,
         "bat_stats": bat_stats,
         "pitch_stats": pitch_stats,
-        "bat_game": game_summary(bat_player, "batting"),
-        "pitch_game": game_summary(pitch_player, "pitching"),
     }
 
 def first_pitch_thrown(feed):
@@ -225,26 +213,9 @@ def contrast(background):
     luminance = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722
     return "#000000" if luminance > 0.179 else "#FFFFFF"
 
-def display_name(name):
-    # The compact bitmap fonts do not cover accented Latin characters.
-    name = name.upper()
-    for accented, plain in [("ÁÀÂÄÃÅ", "A"), ("ÉÈÊË", "E"), ("ÍÌÎÏ", "I"), ("ÓÒÔÖÕ", "O"), ("ÚÙÛÜ", "U"), ("Ñ", "N"), ("Ç", "C")]:
-        for letter in accented.codepoints():
-            name = name.replace(letter, plain)
-    return name
-
-def text_line(content, color, width, name = False):
-    font = "6x10" if canvas.is2x() else "CG-pixel-3x5-mono"
-    label = render.Text(content, font = font, color = color)
-    if name:
-        return render.Marquee(
-            child = label,
-            width = width,
-            align = "start",
-            offset_end = width,
-            delay = 54 if canvas.is2x() else 27,
-        )
-    return label
+def text_line(content, color):
+    font = "terminus-16" if canvas.is2x() else "tb-8"
+    return render.Text(content, font = font, color = color)
 
 def section(team, rows):
     scale = 2 if canvas.is2x() else 1
@@ -256,22 +227,11 @@ def section(team, rows):
         color = background,
         child = render.Padding(
             pad = (scale, 0, scale, 0),
-            child = render.Row(
+            child = render.Column(
                 expanded = True,
-                main_align = "start",
-                children = [render.Column(
-                    cross_align = "start",
-                    children = [
-                        text_line(rows[0], foreground, canvas.width() - 2 * scale, name = True),
-                        render.Padding(
-                            pad = (2 * scale, 0, 0, 0),
-                            child = render.Column(
-                                cross_align = "start",
-                                children = [text_line(row, foreground, canvas.width() - 4 * scale) for row in rows[1:]],
-                            ),
-                        ),
-                    ],
-                )],
+                main_align = "space-between",
+                cross_align = "start",
+                children = [text_line(row, foreground) for row in rows],
             ),
         ),
     )
@@ -280,18 +240,15 @@ def render_matchup(state):
     bat = state["bat_stats"]
     pitch = state["pitch_stats"]
     return render.Root(
-        delay = 37 if canvas.is2x() else 75,
         max_age = 15,
         child = render.Column(children = [
             section(state["bat_team"], [
-                "B:" + display_name(state["bat_name"]) + state.get("bat_game", ""),
                 "AVG {}".format(bat["avg"]),
-                "{}HR {}RBI".format(bat["homeRuns"], bat["rbi"]),
+                "{} HR {} RBI".format(whole_count(bat["homeRuns"]), whole_count(bat["rbi"])),
             ]),
             section(state["pitch_team"], [
-                "P:" + display_name(state["pitch_name"]) + state.get("pitch_game", ""),
-                "{}ERA {}K".format(pitch["era"], pitch["strikeOuts"]),
-                "{}BB {}HR".format(pitch["baseOnBalls"], pitch["homeRuns"]),
+                "{} ERA {} K".format(pitch["era"], whole_count(pitch["strikeOuts"])),
+                "{} BB {} HR".format(whole_count(pitch["baseOnBalls"]), whole_count(pitch["homeRuns"])),
             ]),
         ]),
     )
